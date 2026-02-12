@@ -50,17 +50,27 @@ def load_grid_json(path):
         data = json.load(f)
     return data["grid"]
 
-def draw_grid(canvas, grid):
+def draw_grid(canvas, grid, path=None, start=None, goal=None):
     canvas.delete("all")
     rows, cols = len(grid), len(grid[0])
+    path_set = set(path) if path else set()
     for r in range(rows):
         for c in range(cols):
             x1, y1 = c * CELL_SIZE, r * CELL_SIZE
             x2, y2 = x1 + CELL_SIZE, y1 + CELL_SIZE
-            color = "black" if grid[r][c] == 1 else "white"
+            if (r, c) == start:
+                color = "green"
+            elif (r, c) == goal:
+                color = "red"
+            elif (r, c) in path_set:
+                color = "blue"
+            elif grid[r][c] == 1:
+                color = "black"
+            else:
+                color = "white"
             canvas.create_rectangle(x1, y1, x2, y2, fill=color)
 
-def show_grid(grid):
+def show_grid(grid, path=None, start=None, goal=None):
     rows, cols = len(grid), len(grid[0])
     root = tk.Tk()
     root.title("Maze")
@@ -68,7 +78,7 @@ def show_grid(grid):
     canvas = tk.Canvas(root, width=cols * CELL_SIZE, height=rows * CELL_SIZE)
     canvas.pack()
 
-    draw_grid(canvas, grid)
+    draw_grid(canvas, grid, path, start, goal)
     root.mainloop()
 
 def main(): 
