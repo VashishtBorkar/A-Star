@@ -3,7 +3,7 @@ import json
 import tkinter as tk
 GRID_SIZE = 10
 P_BLOCKED = 0.4
-CELL_SIZE = 8
+CELL_SIZE = 30
 
 seed = 100
 random.seed(seed)
@@ -60,7 +60,7 @@ def draw_grid(canvas, grid):
             color = "black" if grid[r][c] == 1 else "white"
             canvas.create_rectangle(x1, y1, x2, y2, fill=color)
 
-def display_grid(grid):
+def show_grid(grid):
     rows, cols = len(grid), len(grid[0])
     root = tk.Tk()
     root.title("Maze")
@@ -73,7 +73,7 @@ def display_grid(grid):
 
 def main(): 
     grid = generate_grid(GRID_SIZE, P_BLOCKED)
-    display_grid(grid)
+    show_grid(grid)
 
 if __name__ == "__main__":
     main()
