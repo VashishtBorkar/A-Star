@@ -43,8 +43,37 @@ def a_star(grid, start, goal):
                 f = new_g + manhattan_distance(neighbor, goal)
                 heapq.heappush(open_list, (f, neighbor))
 
-def repeated_a_star(grid, start, goal):
-    pass
+def repeated_a_star(true_grid, start, goal, forward=True):
+    n = len(true_grid)
+    agent_grid = [[0 for _ in range(n)] for _ in range(n)]
+    current = start
+    final_path = [current]
 
+    while current != goal:
+        if forward:
+            path = a_star(agent_grid, current, goal)
+        else:
+            path = a_star(agent_grid, goal, current)
+
+        if not path:
+            return None
+        
+        if not forward:
+            path = path[::-1]
+        
+        for cell in path[1:]:
+            r, c = cell
+            if true_grid[r][c] == 1:
+                agent_grid[r][c] = 1
+                break
+
+            current = cell
+            final_path.append(current)
+
+            if current == goal:
+                return final_path
+            
+    return final_path
+        
 def adaptive_a_star(grid, start, goal):
     pass
