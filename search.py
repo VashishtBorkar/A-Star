@@ -43,6 +43,51 @@ def a_star(grid, start, goal):
                 f = new_g + manhattan_distance(neighbor, goal)
                 heapq.heappush(open_list, (f, neighbor))
 
+
+def adaptive_a_star(grid, start, goal, h_values=None):
+    open_list = [] # heap
+    if h_values and start in h_values:
+        h_start = h_values[start]
+    else:
+        h_start = manhattan_distance(start, goal)
+
+    heapq.heappush(open_list, (h_start, start)) # (f, (x, y))
+    closed_list = set() 
+    g = {start: 0} # g[(x, y)] = cost
+    parent = {start: None} # parent cells
+
+    while open_list:
+        f, curr_cell = heapq.heappop(open_list)
+
+        if curr_cell == goal:
+            path = []
+            while curr_cell is not None:
+                path.append(curr_cell)
+                curr_cell = parent[curr_cell]
+            return path[::-1], closed_list, g
+
+        closed_list.add(curr_cell)
+
+        for neighbor in get_neighbors(curr_cell, grid):
+            if neighbor in closed_list:
+                continue
+
+            new_g = 1 + g[curr_cell]
+
+            if neighbor not in g or new_g < g[neighbor]:
+                parent[neighbor] = curr_cell
+                g[neighbor] = new_g
+                if neighbor in h_values:
+                    h = h_values[neighbor]
+                else:
+                    h = manhattan_distance(neighbor, goal)
+
+                f = new_g + h
+                
+                heapq.heappush(open_list, (f, neighbor))
+        
+    return None, closed_list, g
+
 def repeated_a_star(true_grid, start, goal, forward=True):
     n = len(true_grid)
     agent_grid = [[0 for _ in range(n)] for _ in range(n)]
@@ -74,6 +119,36 @@ def repeated_a_star(true_grid, start, goal, forward=True):
                 return final_path
             
     return final_path
+       
+def repeated_adaptive_a_star(true_grid, start, goal):
+    n = len(true_grid)
+    agent_grid = [[0 for _ in range(n)] for _ in range(n)]
+    h_values = {}
+
+    current = start
+    final_path = [current]
+
+    while current != goal:
+        path, closed_list, g = adaptive_a_star(agent_grid, current, goal, h_values)
+
+        if not path:
+            return None
         
-def adaptive_a_star(grid, start, goal):
-    pass
+        g_goal = g[goal] if goal in g else float('inf')
+        
+        for state in closed_list:
+            h_values[state] = g_goal - g[state]
+            
+        for cell in path[1:]:
+            r, c = cell
+            if true_grid[r][c] == 1:
+                agent_grid[r][c] = 1
+                break
+
+            current = cell
+            final_path.append(current)
+
+            if current == goal:
+                return final_path
+            
+    return final_path
