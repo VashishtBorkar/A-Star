@@ -55,6 +55,65 @@ def readMazes(fname: str) -> List[List[List[int]]]:
         maze[END_NODE[0]][END_NODE[1]] = 0
         mazes.append(maze)
     return mazes
+def manhattan_distance(p1, p2):
+    return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
+
+def get_neighbors(pos, grid):
+    neighbors = []
+    directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+    for dx, dy in directions:
+        nx, ny = pos[0] + dx, pos[1] + dy
+        if 0 <= nx < len(grid) and 0 <= ny < len(grid[0]) and grid[nx][ny] == 0:
+            neighbors.append((nx, ny))
+    
+    return neighbors
+
+def adaptive_a_star_search(grid, start, goal, h_values, callbacks=None): 
+    # Single A* search implementation for repeated adaptive A*
+    open_list = CustomPQ_maxG()
+    h_start = h_values.get(start, manhattan_distance(start, goal))
+    open_list.push(h_start, 0, start)
+
+    closed_list = set() 
+    g = {start: 0} # g[(x, y)] = cost
+    parent = {start: None} # parent cells
+
+    expanded = 0
+
+    while open_list:
+        f, _, curr_cell = open_list.pop()
+
+        if curr_cell == goal:
+            path = []
+            while curr_cell is not None:
+                path.append(curr_cell)
+                curr_cell = parent[curr_cell]
+            return path[::-1], expanded, g, closed_list
+
+        closed_list.add(curr_cell)
+        expanded += 1
+
+        if callbacks:
+            callbacks['on_expand'](curr_cell)
+
+        for neighbor in get_neighbors(curr_cell, grid):
+            r, c = neighbor
+            if neighbor in closed_list:
+                continue
+            if grid[r][c] == 1:
+                continue
+
+            new_g = 1 + g[curr_cell]
+
+            if neighbor not in g or new_g < g[neighbor]:
+                parent[neighbor] = curr_cell
+                g[neighbor] = new_g
+                h = h_values.get(neighbor, manhattan_distance(neighbor, goal))
+                f = new_g + h
+                
+                open_list.push(f, new_g, neighbor)
+        
+    return None, expanded, g, closed_list
 
 def adaptive_astar(
     actual_maze: List[List[int]],
@@ -65,7 +124,64 @@ def adaptive_astar(
     
     # TODO: Implement Adaptive A* with max_g tie-braking strategy.
     # Use heapq for standard priority queue implementation and name your max_g heap class as `CustomPQ_maxG` and use it. 
-    pass
+    n = len(actual_maze)
+    agent_grid = [[0 for _ in range(n)] for _ in range(n)]
+    h_values = {}
+
+    current = start
+    final_path = [current]
+    expanded_total = 0
+    replans = 0
+
+    cb = visualize_callbacks
+
+    for neighbor in get_neighbors(current, actual_maze):
+        r, c = neighbor
+        if actual_maze[r][c] == 1:
+            agent_grid[r][c] = 1
+        if cb:
+            cb["on_observe"](neighbor, is_blocked=(actual_maze[r][c] == 1))
+
+    while current != goal:
+        replans += 1
+        if cb:
+            cb["on_replan"]()
+        
+        path, expanded, g, closed_list = adaptive_a_star_search(agent_grid, current, goal, h_values, callbacks=cb)
+        expanded_total += expanded
+
+        if not path:
+            return False, final_path, expanded_total, replans
+        
+        g_goal = g[goal]
+        
+        for state in closed_list:
+            h_values[state] = g_goal - g[state]
+            
+        for cell in path[1:]:
+            r, c = cell
+            if actual_maze[r][c] == 1:
+                agent_grid[r][c] = 1
+                if cb:
+                    cb["on_observe"](cell, is_blocked=True)
+                break
+                
+            current = cell
+            final_path.append(current)
+            if cb:
+                cb["on_move"](current)
+
+            for neighbor in get_neighbors(current, actual_maze):
+                r, c = neighbor
+                if actual_maze[r][c] == 1:
+                    agent_grid[r][c] = 1
+                if cb:
+                    cb["on_observe"](neighbor, is_blocked=(actual_maze[r][c] == 1))
+
+            if current == goal:
+                return True, final_path, expanded_total, replans
+            
+    return True, final_path, expanded_total, replans
 
 def show_astar_search(win: pygame.Surface, actual_maze: List[List[int]], algo: str, fps: int = 240, step_delay_ms: int = 0, save_path: Optional[str] = None) -> None:
     # [BONUS] TODO: Place your visualization code here.
@@ -77,6 +193,121 @@ def show_astar_search(win: pygame.Surface, actual_maze: List[List[int]], algo: s
     # In the end it should store the visualization as a PNG file if save_path is provided, or default to "vis_{algo}.png".
     # print(f"[{algo}] found={found}  executed_steps={len(executed)-1}  expanded={expanded}  replans={replans}")
 
+    n = len(actual_maze)
+    cell_size = NODE_LENGTH
+
+    left_offset_x = 0
+    right_offset_x = GRID_LENGTH + GAP
+
+    knowledge = [[-1 for _ in range(n)] for _ in range(n)]  # -1=unknown, 0=free, 1=blocked
+    expanded_cells = set()
+    executed_path = []
+    agent_pos = START_NODE
+
+    clock = pygame.time.Clock()
+
+    def draw_cell(x_offset, row, col, color):
+        rect = pygame.Rect(
+            x_offset + col * cell_size,
+            row * cell_size,
+            cell_size,
+            cell_size,
+        )
+        pygame.draw.rect(win, color, rect)
+
+    def draw_left_grid(): # actual maze
+        for r in range(n):
+            for c in range(n):
+                if actual_maze[r][c] == 1:
+                    draw_cell(left_offset_x, r, c, BLACK)
+                else:
+                    draw_cell(left_offset_x, r, c, WHITE)
+
+        for cell in executed_path:
+            draw_cell(left_offset_x, cell[0], cell[1], PATH)
+
+        draw_cell(left_offset_x, START_NODE[0], START_NODE[1], YELLOW)
+        draw_cell(left_offset_x, END_NODE[0], END_NODE[1], BLUE)
+        draw_cell(left_offset_x, agent_pos[0], agent_pos[1], YELLOW)
+
+    def draw_right_grid():
+        """Agent knowledge + expanded cells overlay."""
+        for r in range(n):
+            for c in range(n):
+                if knowledge[r][c] == 1:
+                    draw_cell(right_offset_x, r, c, BLACK)
+                elif knowledge[r][c] == 0:
+                    draw_cell(right_offset_x, r, c, WHITE)
+                else:
+                    draw_cell(right_offset_x, r, c, GREY)
+
+        # Expanded cells from current A* search
+        for cell in expanded_cells:
+            if cell != START_NODE and cell != END_NODE:
+                draw_cell(right_offset_x, cell[0], cell[1], GREY)
+
+        # Executed path
+        for cell in executed_path:
+            draw_cell(right_offset_x, cell[0], cell[1], PATH)
+
+        # Start, goal, agent
+        draw_cell(right_offset_x, START_NODE[0], START_NODE[1], YELLOW)
+        draw_cell(right_offset_x, END_NODE[0], END_NODE[1], BLUE)
+        draw_cell(right_offset_x, agent_pos[0], agent_pos[1], YELLOW)
+
+    def refresh():
+        win.fill(BLACK)
+        draw_left_grid()
+        draw_right_grid()
+        pygame.display.flip()
+        clock.tick(fps)
+        if step_delay_ms > 0:
+            pygame.time.delay(step_delay_ms)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                raise SystemExit
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                pygame.quit()
+                raise SystemExit
+            
+    # callbacks for visualization
+    def on_expand(cell):
+        expanded_cells.add(cell)
+        # refresh()
+
+    def on_move(cell):
+        nonlocal agent_pos
+        agent_pos = cell
+        executed_path.append(cell)
+        refresh()
+
+    def on_observe(cell, is_blocked):
+        r, c = cell
+        knowledge[r][c] = 1 if is_blocked else 0
+
+    def on_replan():
+        expanded_cells.clear()
+        refresh()
+
+    visualize_callbacks = {
+        "on_expand": on_expand,
+        "on_move": on_move,
+        "on_observe": on_observe,
+        "on_replan": on_replan,
+    }
+
+    found, executed, expanded, replans = adaptive_astar(
+        actual_maze,
+        START_NODE,
+        END_NODE,
+        visualize_callbacks=visualize_callbacks,
+    )
+
+    print(f"[{algo}] found={found}  executed_steps={len(executed)-1}  expanded={expanded}  replans={replans}")
+
+    refresh()
+    
     if save_path is None:
         save_path = f"vis_{algo}.png"
 
@@ -125,7 +356,7 @@ def main() -> None:
             actual_maze=mazes[maze_id],
             start=START_NODE,
             goal=END_NODE,
-            tie_braking="max_g",
+            tie_breaking="max_g",
         )
         t1 = time.perf_counter()
 
