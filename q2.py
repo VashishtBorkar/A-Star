@@ -26,7 +26,6 @@ BLACK  = known blocked
 
 from __future__ import annotations
 
-import heapq
 import argparse
 import json
 from time import time
