@@ -65,23 +65,34 @@ def get_neighbors(pos, grid):
         nx, ny = pos[0] + dx, pos[1] + dy
         if 0 <= nx < len(grid) and 0 <= ny < len(grid[0]) and grid[nx][ny] == 0:
             neighbors.append((nx, ny))
-    
     return neighbors
 
-def adaptive_a_star_search(grid, start, goal, h_values, callbacks=None): 
+
+def sense_neighbors(pos, actual_maze):
+    """Yield ((r,c), is_blocked) for all 4 adjacent in-bounds cells."""
+    r0, c0 = pos
+    for dr, dc in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+        r, c = r0 + dr, c0 + dc
+        if 0 <= r < len(actual_maze) and 0 <= c < len(actual_maze[0]):
+            yield (r, c), (actual_maze[r][c] == 1)
+
+def adaptive_a_star_search(grid, start, goal, h_values, callbacks=None):
     # Single A* search implementation for repeated adaptive A*
     open_list = CustomPQ_maxG()
     h_start = h_values.get(start, manhattan_distance(start, goal))
     open_list.push(h_start, 0, start)
 
-    closed_list = set() 
-    g = {start: 0} # g[(x, y)] = cost
-    parent = {start: None} # parent cells
+    closed_list = set()
+    g = {start: 0}  # g[(x, y)] = cost
+    parent = {start: None}  # parent cells
 
     expanded = 0
 
     while open_list:
         f, _, curr_cell = open_list.pop()
+
+        if curr_cell in closed_list:
+            continue
 
         if curr_cell == goal:
             path = []
@@ -112,7 +123,7 @@ def adaptive_a_star_search(grid, start, goal, h_values, callbacks=None):
                 f = new_g + h
                 
                 open_list.push(f, new_g, neighbor)
-        
+
     return None, expanded, g, closed_list
 
 def adaptive_astar(
@@ -135,18 +146,16 @@ def adaptive_astar(
 
     cb = visualize_callbacks
 
-    for neighbor in get_neighbors(current, actual_maze):
-        r, c = neighbor
-        if actual_maze[r][c] == 1:
-            agent_grid[r][c] = 1
+    for (nr, nc), is_blocked in sense_neighbors(current, actual_maze):
+        agent_grid[nr][nc] = 1 if is_blocked else 0
         if cb:
-            cb["on_observe"](neighbor, is_blocked=(actual_maze[r][c] == 1))
+            cb["on_observe"]((nr, nc), is_blocked=is_blocked)
 
     while current != goal:
         replans += 1
         if cb:
             cb["on_replan"]()
-        
+
         path, expanded, g, closed_list = adaptive_a_star_search(agent_grid, current, goal, h_values, callbacks=cb)
         expanded_total += expanded
 
@@ -154,29 +163,27 @@ def adaptive_astar(
             return False, final_path, expanded_total, replans
         
         g_goal = g[goal]
-        
+
         for state in closed_list:
             h_values[state] = g_goal - g[state]
-            
         for cell in path[1:]:
             r, c = cell
+
             if actual_maze[r][c] == 1:
                 agent_grid[r][c] = 1
                 if cb:
                     cb["on_observe"](cell, is_blocked=True)
                 break
-                
+
             current = cell
             final_path.append(current)
             if cb:
                 cb["on_move"](current)
 
-            for neighbor in get_neighbors(current, actual_maze):
-                r, c = neighbor
-                if actual_maze[r][c] == 1:
-                    agent_grid[r][c] = 1
+            for (nr, nc), is_blocked in sense_neighbors(current, actual_maze):
+                agent_grid[nr][nc] = 1 if is_blocked else 0
                 if cb:
-                    cb["on_observe"](neighbor, is_blocked=(actual_maze[r][c] == 1))
+                    cb["on_observe"]((nr, nc), is_blocked=is_blocked)
 
             if current == goal:
                 return True, final_path, expanded_total, replans
@@ -270,12 +277,11 @@ def show_astar_search(win: pygame.Surface, actual_maze: List[List[int]], algo: s
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 pygame.quit()
                 raise SystemExit
-            
+
     # callbacks for visualization
     def on_expand(cell):
         expanded_cells.add(cell)
         # refresh()
-
     def on_move(cell):
         nonlocal agent_pos
         agent_pos = cell
@@ -307,13 +313,14 @@ def show_astar_search(win: pygame.Surface, actual_maze: List[List[int]], algo: s
     print(f"[{algo}] found={found}  executed_steps={len(executed)-1}  expanded={expanded}  replans={replans}")
 
     refresh()
-    
+
     if save_path is None:
         save_path = f"vis_{algo}.png"
 
     # If 'win' is the display surface (it is), this works:
     pygame.image.save(win, save_path)
     print(f"Saved the visualization -> {save_path}")
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Q5: Adaptive A*")
