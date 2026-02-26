@@ -121,11 +121,6 @@ def repeated_forward_astar(
     tie_breaking: str = "max_g", # "min_g"
     visualize_callbacks: Optional[Dict[str, Callable[[Tuple[int, int]], None]]] = None,
 ) -> Tuple[bool, List[Tuple[int, int]], int, int]:
-    
-    # TODO: Implement Repeated Forward A* with min_g & max_g tie-braking strategies.
-    # Use heapq for standard priority queue implementation and name your max_g heap class as `CustomPQ_maxG` 
-    # and min_g heap class as `CustomPQ_minG`. Place them inside `custom_pq.py` file (see import statement in line 41).
-    # and use it. 
     n = len(actual_maze)
     if actual_maze[start[0]][start[1]] == 1 or actual_maze[goal[0]][goal[1]] == 1:
         return False, [start], 0, 0
@@ -185,15 +180,7 @@ def repeated_forward_astar(
     
 
 def show_astar_search(win: pygame.Surface, actual_maze: List[List[int]], algo: str, fps: int = 240, step_delay_ms: int = 0, save_path: Optional[str] = None) -> None:
-    # [BONUS] TODO: Place your visualization code here.
-    # This function should display the maze used, the agent's knowledge, and the search process as the agent plans and executes.
-    # As a reference, this function takes pygame Surface 'win' to draw on, the actual maze grid, the algorithm name for labeling, 
-    # and optional parameters for controlling the visualization speed and saving a screenshot.
-    # You are free to use other visualization libraries other than pygame. 
-    # You can call repeated_forward_astar with visualize_callbacks that update the Pygame display as the agent plans and executes.
-    # In the end it should store the visualization as a PNG file if save_path is provided, or default to "vis_{algo}.png".
-    # print(f"[{algo}] found={found}  executed_steps={len(executed)-1}  expanded={expanded}  replans={replans}")
-    
+
     n = len(actual_maze)
     cell_size = NODE_LENGTH
 
@@ -274,7 +261,6 @@ def show_astar_search(win: pygame.Surface, actual_maze: List[List[int]], algo: s
     # callbacks for visualization
     def on_expand(cell):
         expanded_cells.add(cell)
-        # refresh()
 
     def on_move(cell):
         nonlocal agent_pos
@@ -317,7 +303,6 @@ def show_astar_search(win: pygame.Surface, actual_maze: List[List[int]], algo: s
     if save_path is None:
         save_path = f"vis_{algo}.png"
 
-    # If 'win' is the display surface (it is), this works:
     pygame.image.save(win, save_path)
     print(f"Saved the visualization -> {save_path}")
 
@@ -382,8 +367,6 @@ def main() -> None:
         results.append(entry)
 
     if args.show_vis:
-        # In case, PyGame is used for visualization, this code initializes a window and runs the visualization for the selected maze and algorithm.
-        # Feel free to modify this code if you use a different visualization library or approach.
         pygame.init()
         win = pygame.display.set_mode((WINDOW_W, WINDOW_H))
         pygame.display.set_caption("Repeated Forward A* Visualization")

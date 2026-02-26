@@ -16,7 +16,6 @@ import argparse
 random.seed(42)
 
 def create_maze() -> list:
-    # TODO: Implement this function to generate and return a random maze as a 2D list of 0s and 1s.
     n = ROWS
     p_blocked = P_BLOCKED
     grid = [[0 for _ in range(n)] for _ in range(n)]
